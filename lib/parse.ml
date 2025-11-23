@@ -1,3 +1,54 @@
+type mode = Normal | Visual | Insert | Operator | Visual_block | Select | Command | Lang | Terminal
+
+type map_type = Map | Noremap
+
+let mode_to_string = function
+  | Normal -> "n"
+  | Visual -> "v"
+  | Insert -> "i"
+  | Operator -> "o"
+  | Visual_block -> "x"
+  | Select -> "s"
+  | Command -> "c"
+  | Lang -> "l"
+  | Terminal -> "t"
+
+let mode_from_string = function
+  | "n" -> Some Normal
+  | "v" -> Some Visual
+  | "i" -> Some Insert
+  | "o" -> Some Operator
+  | "x" -> Some Visual_block
+  | "s" -> Some Select
+  | "c" -> Some Command
+  | "l" -> Some Lang
+  | "t" -> Some Terminal
+  | _ -> None
+
+let map_type_to_string = function
+  | Map -> "map"
+  | Noremap -> "noremap"
+
+let map_type_from_string = function
+  | "map" -> Some Map
+  | "noremap" -> Some Noremap
+  | _ -> None
+
+let parse_keyword (keyword : string) : mode option * map_type =
+  if keyword = "map" then
+    (None, Map)
+  else if keyword = "noremap" then
+    (None, Noremap)
+  else
+    (* Extract mode prefix *)
+    let mode_char = String.sub keyword 0 1 in
+    let rest = String.sub keyword 1 (String.length keyword - 1) in
+    let mode = mode_from_string mode_char in
+    let map_type = map_type_from_string rest in
+    match map_type with
+    | Some mt -> (mode, mt)
+    | None -> (None, Map) (* fallback *)
+
 let modes = ["n"; "v"; "i"; "o"; "x"; "s"; "c"; "l"; "t"]
 let map_types = ["map"; "noremap"]
 
@@ -12,7 +63,8 @@ let mapping_keywords =
   product (^) modes map_types
 
 type mapping = {
-  map_type: string;
+  mode: mode option;
+  map_type: map_type;
   trigger: string;
   target: string;
 }
@@ -34,9 +86,10 @@ let parse_mapping_line (line : string) : mapping option =
   let trimmed = String.trim line in
   let parts = String.split_on_char ' ' trimmed in
   match parts with
-  | map_type :: trigger :: target_parts when List.mem map_type mapping_keywords ->
+  | keyword :: trigger :: target_parts when List.mem keyword mapping_keywords ->
       let target = String.concat " " target_parts in
-      Some { map_type; trigger; target }
+      let (mode, map_type) = parse_keyword keyword in
+      Some { mode; map_type; trigger; target }
   | _ -> None
 
 let parse_file (filename : string) : mapping list =
