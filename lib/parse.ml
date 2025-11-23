@@ -45,23 +45,28 @@ let whitespace1 : unit cparser = many1 (exactly ' ' <|> exactly '\t') >> return 
 
 let word : string cparser = many1 (alpha_num <|> exactly '_') => implode
 
+let token_choice (tokens : (string * 'a) list) : 'a cparser =
+  tokens
+  |> List.map (fun (tok, result) -> token tok >> return result)
+  |> choice
+
 let mode_parser : mode cparser =
-  choice [
-    token "n" >> return Normal;
-    token "v" >> return Visual;
-    token "i" >> return Insert;
-    token "o" >> return Operator;
-    token "x" >> return Visual_block;
-    token "s" >> return Select;
-    token "c" >> return Command;
-    token "l" >> return Lang;
-    token "t" >> return Terminal;
+  token_choice [
+    ("n", Normal);
+    ("v", Visual);
+    ("i", Insert);
+    ("o", Operator);
+    ("x", Visual_block);
+    ("s", Select);
+    ("c", Command);
+    ("l", Lang);
+    ("t", Terminal);
   ]
 
 let map_type_parser : map_type cparser =
-  choice [
-    token "map" >> return Map;
-    token "noremap" >> return Noremap;
+  token_choice [
+    ("map", Map);
+    ("noremap", Noremap);
   ]
 
 let keyword_parser : (mode * map_type) cparser =
