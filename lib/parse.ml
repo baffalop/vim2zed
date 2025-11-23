@@ -52,7 +52,7 @@ let map_type_from_string = function
   | "noremap" -> Some Noremap
   | _ -> None
 
-let split_at (i : int) (s : string) : string * string =
+let split_at ~index:(i : int) (s : string) : string * string =
   (String.sub s 0 i, String.sub s i (String.length s - i))
 
 (** Parse the map keyword, eg. map, vmap, nnoremap... *)
@@ -60,7 +60,7 @@ let parse_keyword (keyword : string) : (mode * map_type) option =
   match map_type_from_string keyword with
   | Some map_type -> Some (All, map_type)
   | None ->
-      let (prefix, suffix) = split_at 1 keyword in
+      let (prefix, suffix) = split_at ~index:1 keyword in
       match (mode_from_string prefix, map_type_from_string suffix) with
       | (Some mode, Some map_type) -> Some (mode, map_type)
       | _ -> None
