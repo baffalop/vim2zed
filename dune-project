@@ -19,7 +19,7 @@
  (name zvim)
  (synopsis "Script for translating vim mappings (vimrc) to Zed keymap")
  (description "")
- (depends ocaml)
+ (depends ocaml opal)
  (tags
   (zed zed-editor vim vimrc vimscript zed-keymap keymap)))
 

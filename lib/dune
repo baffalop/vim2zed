@@ -1,2 +1,3 @@
 (library
- (name zvim))
+ (name zvim)
+ (libraries opal))

@@ -12,6 +12,7 @@ bug-reports: "https://github.com/baffalop/zvim/issues"
 depends: [
   "dune" {>= "3.20"}
   "ocaml"
+  "opal"
   "odoc" {with-doc}
 ]
 build: [

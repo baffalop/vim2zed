@@ -31,52 +31,62 @@ let mode_to_string = function
   | Lang -> "l"
   | Terminal -> "t"
 
-let mode_from_string = function
-  | "n" -> Some Normal
-  | "v" -> Some Visual
-  | "i" -> Some Insert
-  | "o" -> Some Operator
-  | "x" -> Some Visual_block
-  | "s" -> Some Select
-  | "c" -> Some Command
-  | "l" -> Some Lang
-  | "t" -> Some Terminal
-  | _ -> None
-
 let map_type_to_string = function
   | Map -> "map"
   | Noremap -> "noremap"
 
-let map_type_from_string = function
-  | "map" -> Some Map
-  | "noremap" -> Some Noremap
-  | _ -> None
+(* Opal parsers *)
 
-let split_at ~index:(i : int) (s : string) : string * string =
-  (String.sub s 0 i, String.sub s i (String.length s - i))
+open Opal
 
-(** Parse the map keyword, eg. map, vmap, nnoremap... *)
-let parse_keyword (keyword : string) : (mode * map_type) option =
-  match map_type_from_string keyword with
-  | Some map_type -> Some (All, map_type)
-  | None ->
-      let (prefix, suffix) = split_at ~index:1 keyword in
-      match (mode_from_string prefix, map_type_from_string suffix) with
-      | (Some mode, Some map_type) -> Some (mode, map_type)
-      | _ -> None
+let whitespace1 = many1 (exactly ' ' <|> exactly '\t') >> return ()
+
+let word = many1 (alpha_num <|> exactly '_') => implode
+
+let mode_parser =
+  choice [
+    token "n" >> return Normal;
+    token "v" >> return Visual;
+    token "i" >> return Insert;
+    token "o" >> return Operator;
+    token "x" >> return Visual_block;
+    token "s" >> return Select;
+    token "c" >> return Command;
+    token "l" >> return Lang;
+    token "t" >> return Terminal;
+  ]
+
+let map_type_parser =
+  choice [
+    token "map" >> return Map;
+    token "noremap" >> return Noremap;
+  ]
+
+let keyword_parser =
+  choice [
+    (* Handle prefixed commands like "nnoremap", "vmap", etc. *)
+    (mode_parser >>= fun mode ->
+     map_type_parser >>= fun map_type ->
+     return (mode, map_type));
+    (* Handle plain "map" or "noremap" *)
+    (map_type_parser >>= fun map_type ->
+     return (All, map_type));
+  ]
+
+let rest_of_line = many (satisfy (fun c -> c <> '\n')) => implode
+
+let mapping_parser =
+  spaces >>
+  keyword_parser >>= fun (mode, map_type) ->
+  whitespace1 >>
+  word >>= fun trigger ->
+  whitespace1 >>
+  rest_of_line >>= fun target ->
+  return { mode; map_type; trigger; target = String.trim target }
 
 (** Parse a mapping line into its components *)
 let parse_line (line : string) : mapping option =
-  let parts = String.split_on_char ' ' @@ String.trim line in
-  match parts with
-  | keyword :: trigger :: target_parts -> (
-      match parse_keyword keyword with
-      | Some (mode, map_type) ->
-          let target = String.concat " " target_parts in
-          Some { mode; map_type; trigger; target }
-      | None -> None
-  )
-  | _ -> None
+  parse mapping_parser (LazyStream.of_string line)
 
 let parse_file (filename : string) : mapping list =
   let ic = open_in filename in
