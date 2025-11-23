@@ -55,6 +55,7 @@ let map_type_from_string = function
 let split_at (i : int) (s : string) : string * string =
   (String.sub s 0 i, String.sub s i (String.length s - i))
 
+(** Parse the map keyword, eg. map, vmap, nnoremap... *)
 let parse_keyword (keyword : string) : (mode * map_type) option =
   match map_type_from_string keyword with
   | Some map_type -> Some (All, map_type)
