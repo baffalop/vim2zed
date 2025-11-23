@@ -39,11 +39,13 @@ let map_type_to_string = function
 
 open Opal
 
-let whitespace1 = many1 (exactly ' ' <|> exactly '\t') >> return ()
+type 'a cparser = (char, 'a) parser
 
-let word = many1 (alpha_num <|> exactly '_') => implode
+let whitespace1 : unit cparser = many1 (exactly ' ' <|> exactly '\t') >> return ()
 
-let mode_parser =
+let word : string cparser = many1 (alpha_num <|> exactly '_') => implode
+
+let mode_parser : mode cparser =
   choice [
     token "n" >> return Normal;
     token "v" >> return Visual;
@@ -56,26 +58,27 @@ let mode_parser =
     token "t" >> return Terminal;
   ]
 
-let map_type_parser =
+let map_type_parser : map_type cparser =
   choice [
     token "map" >> return Map;
     token "noremap" >> return Noremap;
   ]
 
-let keyword_parser =
+let keyword_parser : (mode * map_type) cparser =
   choice [
     (* Handle prefixed commands like "nnoremap", "vmap", etc. *)
     (mode_parser >>= fun mode ->
      map_type_parser >>= fun map_type ->
      return (mode, map_type));
+
     (* Handle plain "map" or "noremap" *)
     (map_type_parser >>= fun map_type ->
      return (All, map_type));
   ]
 
-let rest_of_line = many (satisfy (fun c -> c <> '\n')) => implode
+let rest_of_line : string cparser = many (satisfy (fun c -> c <> '\n')) => implode
 
-let mapping_parser =
+let mapping_parser : mapping cparser =
   spaces >>
   keyword_parser >>= fun (mode, map_type) ->
   whitespace1 >>
