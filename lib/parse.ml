@@ -41,17 +41,15 @@ open Opal
 
 type 'a cparser = (char, 'a) parser
 
-let whitespace1 : unit cparser = many1 (exactly ' ' <|> exactly '\t') >> return ()
-
-let word : string cparser = many1 (alpha_num <|> exactly '_') => implode
+let non_whitespace : string cparser =
+  many1 (satisfy @@ fun c -> c <> ' ' && c <> '\t') => implode
 
 let token_choice (tokens : (string * 'a) list) : 'a cparser =
   tokens
   |> List.map (fun (tok, result) -> token tok >> return result)
   |> choice
 
-let mode_parser : mode cparser =
-  token_choice [
+let mode_parser : mode cparser = token_choice [
     ("n", Normal);
     ("v", Visual);
     ("i", Insert);
@@ -63,38 +61,34 @@ let mode_parser : mode cparser =
     ("t", Terminal);
   ]
 
-let map_type_parser : map_type cparser =
-  token_choice [
+let map_type_parser : map_type cparser = token_choice [
     ("map", Map);
     ("noremap", Noremap);
   ]
 
 let keyword_parser : (mode * map_type) cparser =
-  choice [
     (* Handle prefixed commands like "nnoremap", "vmap", etc. *)
     (mode_parser >>= fun mode ->
      map_type_parser >>= fun map_type ->
-     return (mode, map_type));
+     return (mode, map_type))
 
     (* Handle plain "map" or "noremap" *)
-    (map_type_parser >>= fun map_type ->
-     return (All, map_type));
-  ]
+    <|> (map_type_parser >>= fun map_type -> return (All, map_type))
 
-let rest_of_line : string cparser = many (satisfy (fun c -> c <> '\n')) => implode
+let rest_of_line : string cparser = many1 (satisfy (fun c -> c <> '\n')) => implode
 
 let mapping_parser : mapping cparser =
   spaces >>
   keyword_parser >>= fun (mode, map_type) ->
-  whitespace1 >>
-  word >>= fun trigger ->
-  whitespace1 >>
+  space >>
+  non_whitespace >>= fun trigger ->
+  space >>
   rest_of_line >>= fun target ->
   return { mode; map_type; trigger; target = String.trim target }
 
 (** Parse a mapping line into its components *)
 let parse_line (line : string) : mapping option =
-  parse mapping_parser (LazyStream.of_string line)
+  parse mapping_parser @@ LazyStream.of_string line
 
 let parse_file (filename : string) : mapping list =
   let ic = open_in filename in
