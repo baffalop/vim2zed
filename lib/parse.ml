@@ -2,11 +2,14 @@ let modes = ["n"; "v"; "i"; "o"; "x"; "s"; "c"; "l"; "t"]
 let map_types = ["map"; "noremap"]
 
 let mapping_keywords =
-  map_types @ List.fold_left (fun acc mode ->
-    List.fold_left (fun acc' map_type ->
-      (mode ^ map_type) :: acc'
-    ) acc map_types
-  ) [] modes
+  let product mapper xs ys =
+    List.fold_left (fun acc x ->
+      List.fold_left (fun acc' y ->
+        mapper x y :: acc'
+      ) acc ys
+    ) [] xs
+  in
+  product (^) modes map_types
 
 (** Check if line is not a comment and starts with a mapping command *)
 let is_mapping_line line =
