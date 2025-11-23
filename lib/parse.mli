@@ -1,9 +1,9 @@
-type mode = Normal | Visual | Insert | Operator | Visual_block | Select | Command | Lang | Terminal
+type mode = All | Normal | Visual | Insert | Operator | Visual_block | Select | Command | Lang | Terminal
 
 type map_type = Map | Noremap
 
 type mapping = {
-  mode: mode option;
+  mode: mode;
   map_type: map_type;
   trigger: string;
   target: string;

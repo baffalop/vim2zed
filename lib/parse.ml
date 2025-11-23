@@ -1,8 +1,16 @@
-type mode = Normal | Visual | Insert | Operator | Visual_block | Select | Command | Lang | Terminal
+type mode = All | Normal | Visual | Insert | Operator | Visual_block | Select | Command | Lang | Terminal
 
 type map_type = Map | Noremap
 
+type mapping = {
+  mode: mode;
+  map_type: map_type;
+  trigger: string;
+  target: string;
+}
+
 let mode_to_string = function
+  | All -> "all"
   | Normal -> "n"
   | Visual -> "v"
   | Insert -> "i"
@@ -34,62 +42,29 @@ let map_type_from_string = function
   | "noremap" -> Some Noremap
   | _ -> None
 
-let parse_keyword (keyword : string) : mode option * map_type =
-  if keyword = "map" then
-    (None, Map)
-  else if keyword = "noremap" then
-    (None, Noremap)
-  else
-    (* Extract mode prefix *)
-    let mode_char = String.sub keyword 0 1 in
-    let rest = String.sub keyword 1 (String.length keyword - 1) in
-    let mode = mode_from_string mode_char in
-    let map_type = map_type_from_string rest in
-    match map_type with
-    | Some mt -> (mode, mt)
-    | None -> (None, Map) (* fallback *)
+let split_at (i : int) (s : string) : string * string =
+  (String.sub s 0 i, String.sub s i (String.length s - i))
 
-let modes = ["n"; "v"; "i"; "o"; "x"; "s"; "c"; "l"; "t"]
-let map_types = ["map"; "noremap"]
-
-let mapping_keywords =
-  let product (mapper : 'a -> 'b -> 'c) (xs : 'a list) (ys : 'b list) : 'c list =
-    List.fold_left (fun acc x ->
-      List.fold_left (fun acc' y ->
-        mapper x y :: acc'
-      ) acc ys
-    ) [] xs
-  in
-  product (^) modes map_types
-
-type mapping = {
-  mode: mode option;
-  map_type: map_type;
-  trigger: string;
-  target: string;
-}
-
-(** Check if line is not a comment and starts with a mapping command *)
-let is_mapping_line (line : string) : bool =
-  let trimmed = String.trim line in
-  if String.length trimmed = 0 || trimmed.[0] = '"' then
-    false
-  else
-    List.exists (fun keyword ->
-      let prefix = keyword ^ " " in
-      String.length trimmed >= String.length prefix &&
-      String.sub trimmed 0 (String.length prefix) = prefix
-    ) mapping_keywords
+let parse_keyword (keyword : string) : (mode * map_type) option =
+  match map_type_from_string keyword with
+  | Some map_type -> Some (All, map_type)
+  | None ->
+      let (prefix, suffix) = split_at 1 keyword in
+      match (mode_from_string prefix, map_type_from_string suffix) with
+      | (Some mode, Some map_type) -> Some (mode, map_type)
+      | _ -> None
 
 (** Parse a mapping line into its components *)
-let parse_mapping_line (line : string) : mapping option =
-  let trimmed = String.trim line in
-  let parts = String.split_on_char ' ' trimmed in
+let parse_line (line : string) : mapping option =
+  let parts = String.split_on_char ' ' @@ String.trim line in
   match parts with
-  | keyword :: trigger :: target_parts when List.mem keyword mapping_keywords ->
-      let target = String.concat " " target_parts in
-      let (mode, map_type) = parse_keyword keyword in
-      Some { mode; map_type; trigger; target }
+  | keyword :: trigger :: target_parts -> (
+      match parse_keyword keyword with
+      | Some (mode, map_type) ->
+          let target = String.concat " " target_parts in
+          Some { mode; map_type; trigger; target }
+      | None -> None
+  )
   | _ -> None
 
 let parse_file (filename : string) : mapping list =
@@ -97,12 +72,9 @@ let parse_file (filename : string) : mapping list =
   let rec read_lines (acc : mapping list) : mapping list =
     try
       let line = input_line ic in
-      if is_mapping_line line then
-        match parse_mapping_line line with
-        | Some mapping -> read_lines (mapping :: acc)
-        | None -> read_lines acc
-      else
-        read_lines acc
+      match parse_line line with
+      | Some mapping -> read_lines (mapping :: acc)
+      | None -> read_lines acc
     with
     | End_of_file -> List.rev acc
   in

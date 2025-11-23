@@ -4,10 +4,7 @@ let () =
       let open Zvim.Parse in
       let mappings = parse_file filename in
       List.iter (fun (mapping : mapping) ->
-        let mode_str = match mapping.mode with
-          | Some mode -> mode_to_string mode
-          | None -> "none"
-        in
+        let mode_str = mode_to_string mapping.mode in
         let map_type_str = map_type_to_string mapping.map_type in
         Printf.printf "Mode: %s, Map Type: %s, Trigger: %s, Target: %s\n"
           mode_str
