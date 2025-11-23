@@ -1,7 +1,7 @@
 let modes = ["n"; "v"; "i"; "o"; "x"; "s"; "c"; "l"; "t"]
 let map_types = ["map"; "noremap"]
 
-let mapping_prefixes =
+let mapping_keywords =
   map_types @ List.fold_left (fun acc mode ->
     List.fold_left (fun acc' map_type ->
       (mode ^ map_type) :: acc'
@@ -14,10 +14,11 @@ let is_mapping_line line =
   if String.length trimmed = 0 || trimmed.[0] = '"' then
     false
   else
-    List.exists (fun prefix ->
+    List.exists (fun keyword ->
+      let prefix = keyword ^ " " in
       String.length trimmed >= String.length prefix &&
       String.sub trimmed 0 (String.length prefix) = prefix
-    ) mapping_prefixes
+    ) mapping_keywords
 
 let parse_file filename =
   let ic = open_in filename in
