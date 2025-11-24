@@ -22,6 +22,8 @@ type context_block = {
 (** The complete keymap structure *)
 type keymap = context_block list
 
+val to_json : keymap -> Yojson.Safe.t
+
 (** {1 Pretty Printing} *)
 module Print : sig
   val cmd : cmd -> string

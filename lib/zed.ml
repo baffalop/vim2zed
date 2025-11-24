@@ -23,7 +23,23 @@ type context_block = {
 type keymap = context_block list
 
 
-(** Pretty printing functions *)
+let to_json (keymap : keymap) : Yojson.Safe.t =
+  let cmd_to_json : cmd -> Yojson.Safe.t = function
+    | Cmd name -> `String name
+    | CmdArgs (name, arg) -> `List [`String name; arg]
+    | Null -> `Null
+  in
+  let bindings_to_json (bindings : binding list) : Yojson.Safe.t =
+    `Assoc (bindings |> List.map (fun { key; cmd } -> (key, cmd_to_json cmd)))
+  in
+  let context_block_to_json (block : context_block) : Yojson.Safe.t = `Assoc [
+    ("context", `String block.context);
+    ("bindings", bindings_to_json block.bindings);
+    ("useKeyEquivalents", `Bool (Option.value block.use_key_equivalents ~default:true));
+  ] in
+  `List (List.map context_block_to_json keymap)
+
+
 module Print = struct
   let cmd : cmd -> string = function
   | Cmd name -> name
