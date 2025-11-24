@@ -2,15 +2,15 @@ open Yojson.Safe
 
 (** Type definitions for Zed keymap structure *)
 
-(** Represents an action that can be bound to a key *)
-type action =
-  | SimpleAction of string
-  | ActionWithParams of string * (string * Yojson.Safe.t) list
+(** Represents a command that can be bound to a key *)
+type cmd =
+  | Cmd of string
+  | CmdArgs of string * (string * Yojson.Safe.t) list
 
 (** Represents a key binding entry *)
 type binding = {
   key: string;
-  action: action;
+  cmd: cmd;
 }
 
 (** Represents a context block with its condition and bindings *)
@@ -26,15 +26,15 @@ type keymap = context_block list
 
 (** Pretty printing functions *)
 module Print = struct
-  let action : action -> string = function
-  | SimpleAction name -> name
-  | ActionWithParams (name, params) ->
+  let cmd : cmd -> string = function
+  | Cmd name -> name
+  | CmdArgs (name, params) ->
       let param_strings = List.map (fun (k, v) ->
         Printf.sprintf "%s: %s" k (to_string v)) params in
       Printf.sprintf "%s(%s)" name (String.concat ", " param_strings)
 
   let binding (b : binding) : string =
-    Printf.sprintf "%s -> %s" b.key (action b.action)
+    Printf.sprintf "%s -> %s" b.key (cmd b.cmd)
 
   let context_block (block : context_block) : string =
     let bindings_str = String.concat "\n  " (List.map binding block.bindings) in
@@ -76,7 +76,7 @@ let get_all_keys (keymap : keymap) : string list =
 (** Get all unique actions used across all contexts *)
 let get_all_actions (keymap : keymap) : string list =
   let all_bindings = List.concat_map (fun block -> block.bindings) keymap in
-  let actions = List.map (fun binding -> Print.action binding.action) all_bindings in
+  let actions = List.map (fun binding -> Print.cmd binding.cmd) all_bindings in
   List.sort_uniq String.compare actions
 
 (** Get all unique contexts *)
@@ -93,19 +93,19 @@ module Parse : sig
   val validate_keymap : keymap -> string list
   val debug_print : keymap -> unit
 end = struct
-  let parse_action ~(context : string) ~(key : string) (json : Yojson.Safe.t) : action =
+  let parse_action ~(context : string) ~(key : string) (json : Yojson.Safe.t) : cmd =
     match json with
-    | `String action_name -> SimpleAction action_name
+    | `String action_name -> Cmd action_name
     | `List [`String action_name; `Assoc params] ->
         let parsed_params = List.map (fun (k, v) -> (k, v)) params in
-        ActionWithParams (action_name, parsed_params)
+        CmdArgs (action_name, parsed_params)
     | _ ->
         let json_str = Yojson.Safe.pretty_to_string json in
-        failwith @@ Printf.sprintf "Invalid action format for key '%s' in context '%s': %s" key context json_str
+        failwith @@ Printf.sprintf "Invalid command format for key '%s' in context '%s': %s" key context json_str
 
   let parse_binding ~(context : string) (key : string) (json : Yojson.Safe.t) : binding =
     try
-      { key; action = parse_action ~context ~key json }
+      { key; cmd = parse_action ~context ~key json }
     with
     | Failure msg -> failwith msg
     | exn -> failwith @@ Printf.sprintf "Failed to parse binding for key '%s' in context '%s': %s" key context (Printexc.to_string exn)
@@ -182,11 +182,11 @@ end = struct
       List.iteri (fun j binding ->
         if String.length binding.key = 0 then
           errors := (Printf.sprintf "Context block %d, binding %d has empty key" i j) :: !errors;
-        match binding.action with
-        | SimpleAction "" ->
-            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty action" i j binding.key) :: !errors
-        | ActionWithParams ("", _) ->
-            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty action name" i j binding.key) :: !errors
+        match binding.cmd with
+        | Cmd "" ->
+            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty command" i j binding.key) :: !errors
+        | CmdArgs ("", _) ->
+            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty command name" i j binding.key) :: !errors
         | _ -> ()
       ) block.bindings
     ) keymap;

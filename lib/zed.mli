@@ -1,14 +1,14 @@
 (** Types for representing Zed keymap structure *)
 
-(** Represents an action that can be bound to a key *)
-type action =
-  | SimpleAction of string
-  | ActionWithParams of string * (string * Yojson.Safe.t) list
+(** Represents a command that can be bound to a key *)
+type cmd =
+  | Cmd of string
+  | CmdArgs of string * (string * Yojson.Safe.t) list
 
 (** Represents a key binding entry *)
 type binding = {
   key: string;
-  action: action;
+  cmd: cmd;
 }
 
 (** Represents a context block with its condition and bindings *)
@@ -41,7 +41,7 @@ val get_all_contexts : keymap -> string list
 
 (** {1 Pretty Printing} *)
 module Print : sig
-  val action : action -> string
+  val cmd : cmd -> string
   val binding : binding -> string
   val context_block : context_block -> string
   val keymap : keymap -> string
