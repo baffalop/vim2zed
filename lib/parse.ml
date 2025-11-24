@@ -12,11 +12,28 @@ type mode =
 
 type map_type = Map | Noremap
 
+type keystroke =
+  | Char of char
+  | Leader
+  | Return
+  | Escape
+  | Space
+  | Tab
+  | Backspace
+  | Delete
+  | Control of char
+  | Alt of char
+  | Shift of char
+  | F of int
+  | Arrow of [`Up | `Down | `Left | `Right]
+  | Special of string
+  | Plug of string
+
 type mapping = {
   mode: mode;
   map_type: map_type;
-  trigger: string;
-  target: string;
+  trigger: keystroke list;
+  target: keystroke list;
 }
 
 let mode_to_string = function
@@ -35,14 +52,36 @@ let map_type_to_string = function
   | Map -> "map"
   | Noremap -> "noremap"
 
+let keystroke_to_string = function
+  | Char c -> String.make 1 c
+  | Leader -> "<Leader>"
+  | Return -> "<CR>"
+  | Escape -> "<Esc>"
+  | Space -> "<Space>"
+  | Tab -> "<Tab>"
+  | Backspace -> "<BS>"
+  | Delete -> "<Del>"
+  | Control c -> "<C-" ^ String.make 1 c ^ ">"
+  | Alt c -> "<A-" ^ String.make 1 c ^ ">"
+  | Shift c -> "<S-" ^ String.make 1 c ^ ">"
+  | F n -> "<F" ^ string_of_int n ^ ">"
+  | Arrow `Up -> "<Up>"
+  | Arrow `Down -> "<Down>"
+  | Arrow `Left -> "<Left>"
+  | Arrow `Right -> "<Right>"
+  | Special s -> "<" ^ s ^ ">"
+  | Plug s -> "<Plug>(" ^ s ^ ")"
+
 (* Opal parsers *)
 
 open Opal
 
 type 'a cparser = (char, 'a) parser
 
-let non_whitespace : string cparser =
-  many1 (satisfy @@ fun c -> c <> ' ' && c <> '\t') => implode
+let nospace : char cparser = satisfy (fun c -> c <> ' ' && c <> '\t')
+
+let keystrokes_to_string keystrokes =
+  String.concat "" (List.map keystroke_to_string keystrokes)
 
 let token_choice (tokens : (string * 'a) list) : 'a cparser =
   tokens
@@ -75,16 +114,52 @@ let keyword_parser : (mode * map_type) cparser =
     (* Handle plain "map" or "noremap" *)
     <|> (map_type_parser >>= fun map_type -> return (All, map_type))
 
-let rest_of_line : string cparser = many1 (satisfy (fun c -> c <> '\n')) => implode
+let special_key_parser : keystroke cparser =
+  let simple_special : keystroke cparser = token_choice [
+    ("Leader", Leader);
+    ("CR", Return);
+    ("Esc", Escape);
+    ("Space", Space);
+    ("Tab", Tab);
+    ("BS", Backspace);
+    ("Del", Delete);
+    ("Up", Arrow `Up);
+    ("Down", Arrow `Down);
+    ("Left", Arrow `Left);
+    ("Right", Arrow `Right);
+  ] in
+  let arg_special = choice [
+    token "C-" >> any >>= (fun c -> return @@ Control c);
+    token "A-" >> any >>= (fun c -> return @@ Alt c);
+    token "S-" >> any >>= (fun c -> return @@ Shift c);
+    token "F" >> many1 digit => implode >>= (fun n -> return @@ F (int_of_string n));
+    (many1 @@ satisfy (fun c -> c <> '>')) => implode >>= fun s -> return @@ Special s;
+  ] in
+  let plug : keystroke cparser =
+    token "<Plug>("
+    >> many1 (satisfy (fun c -> c <> ')')) => implode >>= fun s ->
+    exactly ')'
+    >> return @@ Plug s
+  in
+  exactly '<' >> choice [
+    plug;
+    simple_special <|> arg_special >>= fun s -> exactly '>' >> return s;
+  ]
+
+let keystroke_all_parser : keystroke cparser =
+  special_key_parser <|> (any >>= fun c -> return @@ Char c)
+
+let keystroke_nospace_parser : keystroke cparser =
+  special_key_parser <|> (nospace >>= fun c -> return @@ Char c)
 
 let mapping_parser : mapping cparser =
   spaces >>
   keyword_parser >>= fun (mode, map_type) ->
   space >>
-  non_whitespace >>= fun trigger ->
+  many1 keystroke_nospace_parser >>= fun trigger ->
   space >>
-  rest_of_line >>= fun target ->
-  return { mode; map_type; trigger; target = String.trim target }
+  many1 keystroke_all_parser >>= fun target ->
+  return { mode; map_type; trigger; target }
 
 (** Parse a mapping line into its components *)
 let parse_line (line : string) : mapping option =

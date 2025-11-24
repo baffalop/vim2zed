@@ -9,8 +9,8 @@ let () =
         Printf.printf "Mode: %s, Map Type: %s, Trigger: %s, Target: %s\n"
           mode_str
           map_type_str
-          mapping.trigger
-          mapping.target
+          (keystrokes_to_string mapping.trigger)
+          (keystrokes_to_string mapping.target)
       ) mappings
   | _ ->
       Printf.eprintf "Usage: %s <vim_file>\n" Sys.argv.(0);
