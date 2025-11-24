@@ -22,24 +22,6 @@ type context_block = {
 (** The complete keymap structure *)
 type keymap = context_block list
 
-(** {1 Query Functions} *)
-
-(** Find all bindings for a specific context *)
-val find_context_bindings : keymap -> string -> binding list
-
-(** Find all contexts that bind a specific key *)
-val find_key_contexts : keymap -> string -> string list
-
-(** Get all unique keys used across all contexts *)
-val get_all_keys : keymap -> string list
-
-(** Get all unique commands used across all contexts *)
-val get_all_cmds : keymap -> string list
-
-(** Get all unique contexts *)
-val get_all_contexts : keymap -> string list
-(** {1 Loading and Parsing} *)
-
 (** {1 Pretty Printing} *)
 module Print : sig
   val cmd : cmd -> string

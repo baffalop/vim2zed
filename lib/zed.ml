@@ -189,37 +189,3 @@ end = struct
       Printf.printf "=== Validation: PASSED ===\n"
     )
 end
-
-
-(** Utility functions for working with keymaps *)
-
-(** Find all bindings for a specific context *)
-let find_context_bindings (keymap : keymap) (context_name : string) : binding list =
-  let matching_blocks = List.filter (fun block ->
-    String.equal block.context context_name) keymap in
-  List.concat_map (fun block -> block.bindings) matching_blocks
-
-(** Find all contexts that bind a specific key *)
-let find_key_contexts (keymap : keymap) (key : string) : string list =
-  List.filter_map (fun block ->
-    let has_key = List.exists (fun binding ->
-      String.equal binding.key key) block.bindings in
-    if has_key then Some block.context else None
-  ) keymap
-
-(** Get all unique keys used across all contexts *)
-let get_all_keys (keymap : keymap) : string list =
-  let all_bindings = List.concat_map (fun block -> block.bindings) keymap in
-  let keys = List.map (fun binding -> binding.key) all_bindings in
-  List.sort_uniq String.compare keys
-
-(** Get all unique commands used across all contexts *)
-let get_all_cmds (keymap : keymap) : string list =
-  let all_bindings = List.concat_map (fun block -> block.bindings) keymap in
-  let cmds = List.map (fun binding -> Print.cmd binding.cmd) all_bindings in
-  List.sort_uniq String.compare cmds
-
-(** Get all unique contexts *)
-let get_all_contexts (keymap : keymap) : string list =
-  List.map (fun block -> block.context) keymap
-  |> List.sort_uniq String.compare
