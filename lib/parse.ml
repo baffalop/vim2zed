@@ -78,6 +78,9 @@ open Opal
 
 type 'a cparser = (char, 'a) parser
 
+let until (end_c : char) : string cparser =
+  many1 (satisfy (fun c -> c <> end_c)) => implode
+
 let nospace : char cparser = satisfy (fun c -> c <> ' ' && c <> '\t')
 
 let keystrokes_to_string keystrokes =
@@ -133,11 +136,10 @@ let special_key_parser : keystroke cparser =
     token "A-" >> any >>= (fun c -> return @@ Alt c);
     token "S-" >> any >>= (fun c -> return @@ Shift c);
     token "F" >> many1 digit => implode >>= (fun n -> return @@ F (int_of_string n));
-    (many1 @@ satisfy (fun c -> c <> '>')) => implode >>= fun s -> return @@ Special s;
+    until '>' >>= fun s -> return @@ Special s;
   ] in
   let plug : keystroke cparser =
-    token "<Plug>("
-    >> many1 (satisfy (fun c -> c <> ')')) => implode >>= fun s ->
+    token "<Plug>(" >> until ')' >>= fun s ->
     exactly ')'
     >> return @@ Plug s
   in
