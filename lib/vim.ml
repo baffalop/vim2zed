@@ -36,7 +36,9 @@ type mapping = {
   target: keystroke list;
 }
 
-let mode_to_string = function
+(* pretty printing *)
+
+let string_of_mode = function
   | All -> "all"
   | Normal -> "n"
   | Visual -> "v"
@@ -48,11 +50,11 @@ let mode_to_string = function
   | Lang -> "l"
   | Terminal -> "t"
 
-let map_type_to_string = function
+let string_of_map_type = function
   | Map -> "map"
   | Noremap -> "noremap"
 
-let keystroke_to_string = function
+let string_of_keystroke = function
   | Char c -> String.make 1 c
   | Leader -> "<Leader>"
   | Return -> "<CR>"
@@ -72,8 +74,17 @@ let keystroke_to_string = function
   | Special s -> "<" ^ s ^ ">"
   | Plug s -> "<Plug>(" ^ s ^ ")"
 
-let keystrokes_to_string keystrokes =
-  String.concat " " (List.map keystroke_to_string keystrokes)
+let string_of_keystrokes keystrokes =
+  String.concat " " (List.map string_of_keystroke keystrokes)
+
+let pretty_print : mapping list -> unit =
+  List.iter @@ fun (mapping : mapping) ->
+    Printf.printf "Mode: %s, Map Type: %s, Trigger: %s, Target: %s\n"
+      (string_of_mode mapping.mode)
+      (string_of_map_type mapping.map_type)
+      (string_of_keystrokes mapping.trigger)
+      (string_of_keystrokes mapping.target)
+
 
 (* Opal parsers *)
 

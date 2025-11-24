@@ -36,8 +36,10 @@ type mapping = {
   target: keystroke list;
 }
 
-val mode_to_string : mode -> string
-val map_type_to_string : map_type -> string
-val keystroke_to_string : keystroke -> string
-val keystrokes_to_string : keystroke list -> string
 val parse_file : string -> mapping list
+
+val string_of_mode : mode -> string
+val string_of_map_type : map_type -> string
+val string_of_keystroke : keystroke -> string
+val string_of_keystrokes : keystroke list -> string
+val pretty_print : mapping list -> unit

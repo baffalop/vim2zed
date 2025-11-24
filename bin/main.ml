@@ -1,17 +1,10 @@
+open Vim2zed
+
 let () =
   match Array.to_list Sys.argv with
   | [_; filename] ->
-      let open Vim2zed.Vim in
-      let mappings = parse_file filename in
-      List.iter (fun (mapping : mapping) ->
-        let mode_str = mode_to_string mapping.mode in
-        let map_type_str = map_type_to_string mapping.map_type in
-        Printf.printf "Mode: %s, Map Type: %s, Trigger: %s, Target: %s\n"
-          mode_str
-          map_type_str
-          (keystrokes_to_string mapping.trigger)
-          (keystrokes_to_string mapping.target)
-      ) mappings;
+      let mappings = Vim.parse_file filename in
+      Vim.pretty_print mappings;
 
       print_endline "";
       print_endline "----- Default keymap -----";
