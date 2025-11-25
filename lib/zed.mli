@@ -19,21 +19,14 @@ type context_block = {
 type keymap = context_block list
 
 val to_json : keymap -> Yojson.Safe.t
+val from_json : Yojson.Safe.t -> (keymap, string) result
+
+(** Load keymap from a JSON file *)
+val load_keymap_from_file : string -> keymap
 
 module Print : sig
   val cmd : cmd -> string
   val binding : binding -> string
   val context_block : context_block -> string
   val keymap : keymap -> string
-end
-
-module Parse : sig
-  (** Load keymap from a JSON file *)
-  val load_keymap_from_file : string -> keymap
-
-  (** Parse keymap from JSON *)
-  val parse_keymap : Yojson.Safe.t -> keymap
-
-  (** Print detailed debugging information about keymap structure *)
-  val debug_print : keymap -> unit
 end

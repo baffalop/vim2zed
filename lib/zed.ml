@@ -39,7 +39,6 @@ let bindings_of_yojson (json : Yojson.Safe.t) : (binding list, string) result =
       convert_bindings [] bindings_list
   | _ -> Error "Expected object for bindings"
 
-(** The high level block of bindings for a given context *)
 type context_block = {
   context: string;
   bindings: binding list [@to_yojson bindings_to_yojson] [@of_yojson bindings_of_yojson];
@@ -47,9 +46,18 @@ type context_block = {
 
 type keymap = context_block list [@@deriving yojson]
 
-let to_json (keymap : keymap) : Yojson.Safe.t =
-  (* using derived yojson *)
-  keymap_to_yojson keymap
+let to_json : keymap -> Yojson.Safe.t = keymap_to_yojson
+let from_json : Yojson.Safe.t -> (keymap, string) result = keymap_of_yojson
+
+let load_keymap_from_file (filename : string) : keymap =
+  try
+    match from_json @@ Yojson.Safe.from_file filename with
+    | Ok keymap -> keymap
+    | Error msg -> failwith @@ Printf.sprintf "Keymap parse error in file '%s': %s" filename msg
+  with
+  | Sys_error msg -> failwith @@ Printf.sprintf "Failed to read file '%s': %s" filename msg
+  | Yojson.Json_error msg -> failwith @@ Printf.sprintf "JSON parse error in file '%s': %s" filename msg
+  | exn -> failwith @@ Printf.sprintf "Unexpected error loading '%s': %s" filename (Printexc.to_string exn)
 
 module Print = struct
   let cmd : cmd -> string = function
@@ -66,88 +74,4 @@ module Print = struct
 
   let keymap (k : keymap) : string =
     String.concat "\n\n" @@ List.map context_block k
-end
-
-module Parse : sig
-  val load_keymap_from_file : string -> keymap
-  val parse_keymap : Yojson.Safe.t -> keymap
-
-  val debug_print : keymap -> unit
-end = struct
-  open Yojson.Safe
-
-  (** Parse keymap using generated function with better error handling *)
-  let parse_keymap (json : Yojson.Safe.t) : keymap =
-    match keymap_of_yojson json with
-    | Ok keymap -> keymap
-    | Error msg -> failwith @@ Printf.sprintf "Failed to parse keymap: %s" msg
-
-  let load_keymap_from_file (filename : string) : keymap =
-    try
-      let json = from_file filename in
-      parse_keymap json
-    with
-    | Sys_error msg -> failwith @@ Printf.sprintf "Failed to read file '%s': %s" filename msg
-    | Yojson.Json_error msg -> failwith @@ Printf.sprintf "JSON parse error in file '%s': %s" filename msg
-    | Failure msg -> failwith @@ Printf.sprintf "Keymap parse error in file '%s': %s" filename msg
-    | exn -> failwith @@ Printf.sprintf "Unexpected error loading '%s': %s" filename (Printexc.to_string exn)
-
-  (** Debugging functions *)
-
-  let list_take (n : int) (lst : 'a list) : 'a list =
-    let rec aux acc n = function
-      | [] -> List.rev acc
-      | _ when n <= 0 -> List.rev acc
-      | x :: xs -> aux (x :: acc) (n - 1) xs
-    in
-    aux [] n lst
-
-  (** Validate keymap structure and report any issues *)
-  let validate_keymap (keymap : keymap) : string list =
-    let errors = ref [] in
-    List.iteri (fun i block ->
-      if String.length block.context = 0 then
-        errors := (Printf.sprintf "Context block %d has empty context string" i) :: !errors;
-      List.iteri (fun j binding ->
-        if String.length binding.key = 0 then
-          errors := (Printf.sprintf "Context block %d, binding %d has empty key" i j) :: !errors;
-        match binding.cmd with
-        | Cmd "" ->
-            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty command" i j binding.key) :: !errors
-        | CmdArgs ("", _) ->
-            errors := (Printf.sprintf "Context block %d, binding %d ('%s') has empty command name" i j binding.key) :: !errors
-        | _ -> ()
-      ) block.bindings
-    ) keymap;
-    List.rev !errors
-
-  (** Print detailed information about keymap structure for debugging *)
-  let debug_print (keymap : keymap) : unit =
-    Printf.printf "=== Keymap Debug Info ===\n";
-    Printf.printf "Total context blocks: %d\n\n" (List.length keymap);
-
-    List.iteri (fun i block ->
-      Printf.printf "Block %d:\n" i;
-      Printf.printf "  Context: '%s'\n" block.context;
-      Printf.printf "  Bindings count: %d\n" (List.length block.bindings);
-
-      if List.length block.bindings > 0 then (
-        Printf.printf "  Sample bindings:\n";
-        let sample = list_take 3 block.bindings in
-        List.iter (fun binding ->
-          Printf.printf "    %s\n" (Print.binding binding)
-        ) sample;
-        if List.length block.bindings > 3 then
-          Printf.printf "    ... and %d more\n" (List.length block.bindings - 3)
-      );
-      Printf.printf "\n"
-    ) keymap;
-
-    let validation_errors = validate_keymap keymap in
-    if validation_errors <> [] then (
-      Printf.printf "=== Validation Errors ===\n";
-      List.iter (Printf.printf "ERROR: %s\n") validation_errors
-    ) else (
-      Printf.printf "=== Validation: PASSED ===\n"
-    )
 end
