@@ -1,11 +1,11 @@
 (lang dune 3.20)
 
-(name vim2zed)
+(name v2z)
 
 (generate_opam_files true)
 
 (source
- (github baffalop/vim2zed))
+ (github baffalop/v2z))
 
 (authors "Nikita Gaidakov <nikita.gaidakov@gmail.com>")
 
@@ -13,11 +13,11 @@
 
 (license LICENSE)
 
-(documentation https://github.com/baffalop/vim2zed)
+(documentation https://github.com/baffalop/v2z)
 
 (package
- (name vim2zed)
- (synopsis "Script for translating vim mappings (vimrc) to Zed keymap")
+ (name v2z)
+ (synopsis "Vim-2-Zed: script for translating vim mappings (vimrc) to Zed keymap")
  (description "")
  (depends ocaml opal yojson ppx_deriving ppx_deriving_yojson)
  (tags
