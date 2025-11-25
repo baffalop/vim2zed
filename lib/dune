@@ -1,3 +1,4 @@
 (library
 (name vim2zed)
- (libraries opal yojson))
+ (libraries opal yojson)
+ (preprocess (pps ppx_deriving.show ppx_deriving_yojson)))

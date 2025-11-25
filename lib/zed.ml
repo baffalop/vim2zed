@@ -6,36 +6,51 @@ type cmd =
   | CmdArgs of string * Yojson.Safe.t
   | Null
 
+let cmd_to_yojson : cmd -> Yojson.Safe.t = function
+  | Cmd name -> `String name
+  | CmdArgs (name, arg) -> `List [`String name; arg]
+  | Null -> `Null
+
+let cmd_of_yojson (json : Yojson.Safe.t) : (cmd, string) result =
+  match json with
+  | `String name -> Ok (Cmd name)
+  | `List [`String name; arg] -> Ok (CmdArgs (name, arg))
+  | `Null -> Ok Null
+  | _ -> Error "Invalid command format"
+
 type binding = {
   key: string;
   cmd: cmd;
 }
 
+let bindings_to_yojson (bindings : binding list) : Yojson.Safe.t =
+  `Assoc (bindings |> List.map (fun { key; cmd } -> (key, cmd_to_yojson cmd)))
+
+let bindings_of_yojson (json : Yojson.Safe.t) : (binding list, string) result =
+  match json with
+  | `Assoc bindings_list ->
+      let rec convert_bindings acc = function
+        | [] -> Ok (List.rev acc)
+        | (key, cmd_json) :: rest ->
+            (match cmd_of_yojson cmd_json with
+             | Ok cmd -> convert_bindings ({ key; cmd } :: acc) rest
+             | Error msg -> Error (Printf.sprintf "Failed to parse command for key '%s': %s" key msg))
+      in
+      convert_bindings [] bindings_list
+  | _ -> Error "Expected object for bindings"
+
+(** The high level block of bindings for a given context *)
 type context_block = {
   context: string;
-  bindings: binding list;
-  use_key_equivalents: bool option;
-}
+  bindings: binding list [@to_yojson bindings_to_yojson] [@of_yojson bindings_of_yojson];
+  use_key_equivalents: bool [@default false];
+} [@@deriving yojson]
 
-type keymap = context_block list
-
+type keymap = context_block list [@@deriving yojson]
 
 let to_json (keymap : keymap) : Yojson.Safe.t =
-  let cmd_to_json : cmd -> Yojson.Safe.t = function
-    | Cmd name -> `String name
-    | CmdArgs (name, arg) -> `List [`String name; arg]
-    | Null -> `Null
-  in
-  let bindings_to_json (bindings : binding list) : Yojson.Safe.t =
-    `Assoc (bindings |> List.map (fun { key; cmd } -> (key, cmd_to_json cmd)))
-  in
-  let context_block_to_json (block : context_block) : Yojson.Safe.t = `Assoc [
-    ("context", `String block.context);
-    ("bindings", bindings_to_json block.bindings);
-    ("useKeyEquivalents", `Bool (Option.value block.use_key_equivalents ~default:true));
-  ] in
-  `List (List.map context_block_to_json keymap)
-
+  (* using derived yojson *)
+  keymap_to_yojson keymap
 
 module Print = struct
   let cmd : cmd -> string = function
@@ -47,19 +62,13 @@ module Print = struct
     Printf.sprintf "%s -> %s" b.key (cmd b.cmd)
 
   let context_block (block : context_block) : string =
-    let bindings_str = String.concat "\n  " (List.map binding block.bindings) in
-    let use_key_equiv_str = match block.use_key_equivalents with
-      | Some true -> " [useKeyEquivalents: true]"
-      | Some false -> " [useKeyEquivalents: false]"
-      | None -> ""
-    in
-    Printf.sprintf "Context: %s%s\nBindings:\n  %s"
-      block.context use_key_equiv_str bindings_str
+    Printf.sprintf "Context: %s%s\nBindings:\n  %s" block.context
+      (if block.use_key_equivalents then " [useKeyEquivalents]" else "")
+      (String.concat "\n  " (List.map binding block.bindings))
 
   let keymap (k : keymap) : string =
     String.concat "\n\n" @@ List.map context_block k
 end
-
 
 module Parse : sig
   val load_keymap_from_file : string -> keymap
@@ -69,64 +78,11 @@ module Parse : sig
 end = struct
   open Yojson.Safe
 
-  let parse_cmd ~(context : string) ~(key : string) (json : Yojson.Safe.t) : cmd =
-    match json with
-    | `String name -> Cmd name
-    | `List [`String name; arg] -> CmdArgs (name, arg)
-    | `Null -> Null
-    | _ ->
-        let json_str = Yojson.Safe.pretty_to_string json in
-        failwith @@ Printf.sprintf "Invalid command format for key '%s' in context '%s': %s" key context json_str
-
-  let parse_binding ~(context : string) (key : string) (json : Yojson.Safe.t) : binding =
-    try
-      { key; cmd = parse_cmd ~context ~key json }
-    with
-    | Failure msg -> failwith msg
-    | exn -> failwith @@ Printf.sprintf "Failed to parse binding for key '%s' in context '%s': %s" key context (Printexc.to_string exn)
-
-  let parse_bindings ~(context : string) (json : Yojson.Safe.t) : binding list =
-    match json with
-    | `Assoc bindings_list ->
-        List.map (fun (key, cmd_json) -> parse_binding ~context key cmd_json) bindings_list
-    | _ -> failwith @@ Printf.sprintf "Invalid bindings format in context '%s': expected object, got %s" context (Yojson.Safe.pretty_to_string json)
-
-  let parse_context_block (json : Yojson.Safe.t) : context_block =
-    match json with
-    | `Assoc fields ->
-        let context =
-          match List.assoc_opt "context" fields with
-          | Some (`String ctx) -> ctx
-          | Some other -> failwith @@ Printf.sprintf "Context field must be a string, got: %s" (Yojson.Safe.pretty_to_string other)
-          | None -> failwith "Missing context field in context block"
-        in
-        let bindings =
-          match List.assoc_opt "bindings" fields with
-          | Some bindings_json ->
-              (try parse_bindings ~context bindings_json
-              with Failure msg -> failwith msg
-              | exn -> failwith @@ Printf.sprintf "Failed to parse bindings in context '%s': %s" context (Printexc.to_string exn))
-          | None -> []
-        in
-        let use_key_equivalents =
-          match List.assoc_opt "use_key_equivalents" fields with
-          | Some (`Bool b) -> Some b
-          | None -> None
-          | Some other -> failwith @@ Printf.sprintf "use_key_equivalents field must be a boolean in context '%s', got: %s" context (Yojson.Safe.pretty_to_string other)
-        in
-        { context; bindings; use_key_equivalents }
-    | _ -> failwith @@ Printf.sprintf "Invalid context block format: expected object, got %s" (Yojson.Safe.pretty_to_string json)
-
+  (** Parse keymap using generated function with better error handling *)
   let parse_keymap (json : Yojson.Safe.t) : keymap =
-    match json with
-    | `List context_blocks ->
-        List.mapi (fun i block ->
-          try parse_context_block block
-          with
-          | Failure msg -> failwith @@ Printf.sprintf "Error in context block %d: %s" i msg
-          | exn -> failwith @@ Printf.sprintf "Unexpected error in context block %d: %s" i (Printexc.to_string exn)
-        ) context_blocks
-    | _ -> failwith @@ Printf.sprintf "Invalid keymap format: expected array of context blocks, got %s" (Yojson.Safe.pretty_to_string json)
+    match keymap_of_yojson json with
+    | Ok keymap -> keymap
+    | Error msg -> failwith @@ Printf.sprintf "Failed to parse keymap: %s" msg
 
   let load_keymap_from_file (filename : string) : keymap =
     try
@@ -176,11 +132,7 @@ end = struct
       Printf.printf "Block %d:\n" i;
       Printf.printf "  Context: '%s'\n" block.context;
       Printf.printf "  Bindings count: %d\n" (List.length block.bindings);
-      Printf.printf "  Use key equivalents: %s\n"
-        (match block.use_key_equivalents with
-        | Some true -> "true"
-        | Some false -> "false"
-        | None -> "not set");
+      Printf.printf "  Use key equivalents: %s\n" (string_of_bool block.use_key_equivalents);
 
       if List.length block.bindings > 0 then (
         Printf.printf "  Sample bindings:\n";

@@ -19,7 +19,7 @@
  (name vim2zed)
  (synopsis "Script for translating vim mappings (vimrc) to Zed keymap")
  (description "")
- (depends ocaml opal yojson)
+ (depends ocaml opal yojson ppx_deriving ppx_deriving_yojson)
  (tags
   (zed zed-editor vim vimrc vimscript zed-keymap keymap)))
 
