@@ -59,6 +59,14 @@ let load_keymap_from_file (filename : string) : keymap =
   | Yojson.Json_error msg -> failwith @@ Printf.sprintf "JSON parse error in file '%s': %s" filename msg
   | exn -> failwith @@ Printf.sprintf "Unexpected error loading '%s': %s" filename (Printexc.to_string exn)
 
+module Keymap : sig
+  type t = keymap
+end = struct
+  type t = keymap
+
+  let empty : keymap = []
+end
+
 module Print = struct
   let cmd : cmd -> string = function
   | Cmd name -> name
