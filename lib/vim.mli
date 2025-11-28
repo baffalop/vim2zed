@@ -43,3 +43,7 @@ val string_of_map_type : map_type -> string
 val string_of_keystroke : keystroke -> string
 val string_of_keystrokes : keystroke list -> string
 val pretty_print : mapping list -> unit
+
+module ToZed : sig
+  val keymap : mapping list -> Zed.Keymap.t
+end

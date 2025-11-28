@@ -192,3 +192,28 @@ let parse_file (filename : string) : mapping list =
   let mappings = read_lines [] in
   close_in ic;
   mappings
+
+module ToZed : sig
+  val keymap : mapping list -> Zed.Keymap.t
+end = struct
+  let mode_context (mode: mode) : string =
+    match mode with
+    | All -> "VimControll"
+    | Normal -> "vim_mode == normal"
+    | Insert -> "vim_mode == insert"
+    | Visual -> "vim_mode == visual"
+    | Select -> "vim_mode == select"
+    | Visual_x -> "(vim_mode == visual || vim_mode == select)"
+    | Command -> "vim_mode == command"
+    | Operator -> "vim_mode == operator"
+    | Lang -> "vim_mode == lang"
+    | Terminal -> "vim_mode == terminal"
+
+  let keymap (mappings: mapping list) : Zed.Keymap.t =
+    List.fold_right (fun mapping ->
+      let ctx = (mode_context mapping.mode) ^ " && !menu" in
+      let keystrokes = [] in
+      let cmd = Zed.CmdArgs ("editor::SendKeystrokes", `String (string_of_keystrokes keystrokes)) in
+      Zed.Keymap.add_binding_in_context ~ctx ~key:(string_of_keystrokes mapping.trigger) ~cmd
+    ) mappings Zed.Keymap.empty
+end
