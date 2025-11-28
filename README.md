@@ -8,7 +8,8 @@ A script for translating Vim mappings (vimrc) to Zed keymap format.
 
 - [x] Parse vim mappings
 - [x] Parse Zed base keymap, keymap schema
-- [ ] Transform vim mappings to Zed keymap JSON stdout (via `SendKeystrokes`)
+- [x] Transform vim mappings to Zed keymap JSON stdout (via `SendKeystrokes`)
+  - [ ] Correct handling of special keys
   - [ ] Proper support for `noremap`
 - [ ] CLI: specify output file, various options
   - [ ] Ability to specify alternative default-keymap file
