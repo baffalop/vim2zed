@@ -2,6 +2,8 @@ Always add type annotations for top-level values, unless there's a clear advanta
 
 When there is something useful to document, add doc comments to top-level values using (** ... *). Use these sparingly: code should be self-documenting as much as possible. And keep them concise.
 
+When updating type signatures or adding values to a module, check if mli declarations need to be updated as well. Only add new values to the mli if the value obviously needs to be public.
+
 In simple cases, use @@ to avoid brackets. When there would be no value to naming intermediate values, prefer pipelines.
 
 Because of the way opam switches work, you won't be able to run dune commands yourself. When you're ready to test a change, pass back to me and I'll report any issues.
