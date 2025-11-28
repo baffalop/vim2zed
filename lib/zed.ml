@@ -20,7 +20,7 @@ let cmd_of_yojson (json : Yojson.Safe.t) : (cmd, string) result =
 type binding = {
   key: string;
   cmd: cmd;
-}
+} [@@deriving yojson]
 
 let bindings_to_yojson (bindings : binding list) : Yojson.Safe.t =
   `Assoc (bindings |> List.map (fun { key; cmd } -> (key, cmd_to_yojson cmd)))
@@ -43,7 +43,26 @@ type context_block = {
   bindings: binding list [@to_yojson bindings_to_yojson] [@of_yojson bindings_of_yojson];
 } [@@deriving yojson { strict = false }]
 
-type keymap = context_block list [@@deriving yojson]
+module SMap = Map.Make(String)
+
+type keymap = binding list SMap.t
+
+let keymap_to_yojson (keymap : keymap) : Yojson.Safe.t =
+  `List (SMap.bindings keymap |> List.map (fun (context, bindings) ->
+    context_block_to_yojson { context; bindings }))
+
+let keymap_of_yojson (json : Yojson.Safe.t) : (keymap, string) result =
+  match json with
+  | `List blocks ->
+      let rec parse_blocks acc = function
+        | [] -> Ok acc
+        | block_json :: rest ->
+            (match context_block_of_yojson block_json with
+             | Ok { context; bindings } -> parse_blocks (SMap.add context bindings acc) rest
+             | Error msg -> Error (Printf.sprintf "Failed to parse context block: %s" msg))
+      in
+      parse_blocks SMap.empty blocks
+  | _ -> Error "Expected array for keymap"
 
 module Keymap = struct
   type t = keymap
@@ -63,10 +82,34 @@ module Keymap = struct
 
   (** Constructing a keymap *)
 
-  let empty : keymap = []
+  let empty : keymap = SMap.empty
 
-  let add_binding_in_context ~ctx:(context : string) ~key:(key : string) ~cmd:(cmd : cmd) (keymap : t) =
-    { context; bindings = [{ key; cmd }] } :: keymap
+  let add_binding_in_context ~ctx:(context : string) ~key:(key : string) ~cmd:(cmd : cmd) (keymap : t) : keymap =
+    let new_binding = { key; cmd } in
+    SMap.update context (function
+      | None -> Some [new_binding]
+      | Some existing_bindings -> Some (new_binding :: existing_bindings)
+    ) keymap
+
+  (** Querying and manipulating contexts *)
+
+  let get_context_bindings (context : string) (keymap : t) : binding list =
+    match SMap.find_opt context keymap with
+    | Some bindings -> bindings
+    | None -> []
+
+  let has_context (context : string) (keymap : t) : bool =
+    SMap.mem context keymap
+
+  let remove_context (context : string) (keymap : t) : t =
+    SMap.remove context keymap
+
+  let get_all_contexts (keymap : t) : string list =
+    SMap.bindings keymap |> List.map fst
+
+  let merge_keymaps (keymap1 : t) (keymap2 : t) : t =
+    SMap.union (fun _context bindings1 bindings2 ->
+      Some (bindings1 @ bindings2)) keymap1 keymap2
 end
 
 module Print = struct
@@ -78,10 +121,10 @@ module Print = struct
   let binding (b : binding) : string =
     Printf.sprintf "%s -> %s" b.key (cmd b.cmd)
 
-  let context_block (block : context_block) : string =
-    Printf.sprintf "Context: %s\nBindings:\n  %s" block.context
-    @@ String.concat "\n  " (List.map binding block.bindings)
+  let context_block (context : string) (bindings : binding list) : string =
+    Printf.sprintf "Context: %s\nBindings:\n  %s" context
+    @@ String.concat "\n  " (List.map binding bindings)
 
   let keymap (k : keymap) : string =
-    String.concat "\n\n" @@ List.map context_block k
+    String.concat "\n\n" @@ List.map (fun (context, bindings) -> context_block context bindings) (SMap.bindings k)
 end
