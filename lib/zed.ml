@@ -93,12 +93,11 @@ module Keymap = struct
 
   (** Querying and manipulating *)
 
-  let ctx_bindings (context : string) (keymap : t) : binding list =
-    match SMap.find_opt context keymap with
-    | Some bindings -> bindings
-    | None -> []
+  let ctx_bindings (ctx : string) (keymap : t) : binding list =
+    SMap.find_opt ctx keymap |> Option.value ~default:[]
 
-  let merge : t -> t -> t = SMap.union (fun _context bindings1 bindings2 -> Some (bindings1 @ bindings2))
+  let merge : t -> t -> t =
+    SMap.union (fun _context bindings1 bindings2 -> Some (bindings1 @ bindings2))
 end
 
 module Print = struct
