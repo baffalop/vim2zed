@@ -209,6 +209,8 @@ end = struct
     | Lang -> "vim_mode == lang"
     | Terminal -> "vim_mode == terminal"
 
+  exception Unsupported of string
+
   let key_of : keystroke -> string = function
     | Char c -> Char.escaped c
     | Leader -> " "
@@ -227,15 +229,20 @@ end = struct
       | `Down -> "down"
       | `Left -> "left"
       | `Right -> "right")
-    | Special s -> raise @@ Failure (Printf.sprintf "Special key not supported: <%s>" s)
-    | Plug s -> raise @@ Failure (Printf.sprintf "Can't map Plug command: <%s>" s)
+    | Special s -> raise @@ Unsupported (Printf.sprintf "special key <%s>" s)
+    | Plug s -> raise @@ Unsupported (Printf.sprintf "Plug command <%s>" s)
 
-  let keystrokes (ks: keystroke list) : string = List.map key_of ks |> String.concat " "
+  let keystrokes (ks: keystroke list) : string = ks |> List.map key_of |> String.concat " "
 
   let keymap (mappings: mapping list) : Zed.Keymap.t =
-    List.fold_right (fun mapping ->
-      let ctx = (mode_context mapping.mode) ^ " && !menu" in
-      let cmd = Zed.CmdArgs ("editor::SendKeystrokes", `String (keystrokes mapping.target)) in
-      Zed.Keymap.add_binding ~ctx ~key:(keystrokes mapping.trigger) ~cmd
+    List.fold_right (fun { mode; trigger; target; _ } ->
+      let ctx = mode_context mode ^ " && !menu" in
+      let cmd = try
+          Zed.CmdArgs ("editor::SendKeystrokes", `String (keystrokes target))
+        with
+        | Unsupported msg -> raise @@ Unsupported
+          (Printf.sprintf "Unsupported: %s (mapping %s)" msg @@ string_of_keystrokes trigger)
+      in
+      Zed.Keymap.add_binding ~ctx ~key:(keystrokes trigger) ~cmd
     ) mappings Zed.Keymap.empty
 end
