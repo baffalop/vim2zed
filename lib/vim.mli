@@ -38,12 +38,15 @@ type mapping = {
 
 val parse_file : string -> mapping list
 
-val string_of_mode : mode -> string
-val string_of_map_type : map_type -> string
-val string_of_keystroke : keystroke -> string
-val string_of_keystrokes : keystroke list -> string
-val pretty_print : mapping list -> unit
-
 module ToZed : sig
   val keymap : mapping list -> Zed.Keymap.t
+end
+
+module Print : sig
+  val mode : mode -> string
+  val map_type : map_type -> string
+  val keystrokes : keystroke list -> string
+  val mapping_short : mapping -> string
+  val mapping_full : mapping -> string
+  val pretty : mapping list -> string
 end

@@ -75,13 +75,17 @@ module Print = struct
 
   let keystrokes ks = ks |> List.map keystroke |> String.concat " "
 
-  let pretty_print : mapping list -> unit =
-    List.iter @@ fun (mapping : mapping) ->
-      Printf.printf "Mode: %s, Map Type: %s, Trigger: %s, Target: %s\n"
-        (mode mapping.mode)
-        (map_type mapping.map_type)
-        (keystrokes mapping.trigger)
-        (keystrokes mapping.target)
+  let mapping_short (mapping: mapping) : string =
+    Printf.sprintf "%s => %s" (keystrokes mapping.trigger) (keystrokes mapping.target)
+
+  let mapping_full (mapping: mapping) : string =
+    Printf.sprintf "%s [%s, %s]"
+      (mapping_short mapping)
+      (mode mapping.mode)
+      (map_type mapping.map_type)
+
+  let pretty (mappings : mapping list) : string =
+    mappings |> List.map mapping_full |> String.concat "\n"
 end
 
 
@@ -234,14 +238,14 @@ end = struct
   let keystrokes (ks: keystroke list) : string = ks |> List.map key_of |> String.concat " "
 
   let keymap (mappings: mapping list) : Zed.Keymap.t =
-    List.fold_right (fun { mode; trigger; target; _ } ->
-      let ctx = mode_context mode ^ " && !menu" in
+    List.fold_right (fun mapping ->
+      let ctx = mode_context mapping.mode ^ " && !menu" in
       let cmd = try
-          Zed.CmdArgs ("editor::SendKeystrokes", `String (keystrokes target))
+          Zed.CmdArgs ("editor::SendKeystrokes", `String (keystrokes mapping.target))
         with
         | Unsupported msg -> raise @@ Unsupported
-          (Printf.sprintf "Unsupported: %s (mapping %s)" msg @@ Print.keystrokes trigger)
+          (Printf.sprintf "Unsupported: %s [in: %s]" msg @@ Print.mapping_short mapping)
       in
-      Zed.Keymap.add_binding ~ctx ~key:(keystrokes trigger) ~cmd
+      Zed.Keymap.add_binding ~ctx ~key:(keystrokes mapping.trigger) ~cmd
     ) mappings Zed.Keymap.empty
 end
