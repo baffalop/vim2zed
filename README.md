@@ -20,11 +20,10 @@ A script for translating Vim mappings (vimrc) to Zed keymap format.
 ## Usage
 
 ```bash
-# WIP: output not implemented yet
-v2z input.vim output.json
+v2z input.vim
 ```
 
-This will parse your Vim configuration file and generate a Zed keymap file that you can use in your Zed editor settings.
+This will parse your Vim configuration file and output Zed keymap json that you can add to your Zed keymap file (`zed: open keymap file` ).
 
 ## Build from Source
 
